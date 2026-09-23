@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { getInitials, getColorIndex } from '@/lib/utils';
 
 const AVATAR_COLORS = [
@@ -26,15 +27,17 @@ const sizeClasses: Record<AvatarSize, string> = {
 };
 
 export default function Avatar({ name, src, size = 'md', className = '' }: AvatarProps) {
+  const [imgError, setImgError] = useState(false);
   const colorIdx = getColorIndex(name);
   const initials = getInitials(name);
 
-  if (src) {
+  if (src && !imgError) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={name}
+        onError={() => setImgError(true)}
         className={`rounded-full object-cover flex-shrink-0 ${sizeClasses[size]} ${className}`}
       />
     );

@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [selectedEmail, setSelectedEmail] = useState<ScheduledEmail | SentEmail | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'STARRED' | 'SENT' | 'SCHEDULED' | 'FAILED'>('ALL');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Counts for sidebar badges
@@ -108,26 +109,31 @@ export default function DashboardPage() {
     setSelectedEmail(null);
   };
 
-  const handleScheduled = (isImmediate = false) => {
+  const handleScheduled = () => {
     setRefreshTrigger((prev) => prev + 1);
     loadCounts();
     setView('list');
-    if (isImmediate) {
-      setActiveTab('sent');
-    } else {
-      setActiveTab('scheduled');
-    }
+    setActiveTab('scheduled');
   };
 
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   return (
-    <div className="flex h-screen overflow-hidden bg-white">
+    <div className="flex h-screen overflow-hidden bg-white relative">
       {/* Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        onTabChange={(tab) => { setActiveTab(tab); setView('list'); setSelectedEmail(null); }}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          setActiveFilter('ALL');
+          setView('list');
+          setSelectedEmail(null);
+        }}
         onCompose={handleCompose}
         scheduledCount={scheduledCount}
         sentCount={sentCount}
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* Main content */}
@@ -139,6 +145,10 @@ export default function DashboardPage() {
             isRefreshing={isRefreshing}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            activeTab={activeTab}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            onToggleMobileSidebar={() => setIsMobileSidebarOpen((v) => !v)}
             rightSlot={<SlackConnectButton />}
           />
         )}
@@ -151,7 +161,7 @@ export default function DashboardPage() {
             </div>
           ) : view === 'detail' && selectedEmail ? (
             <div className="flex-1 overflow-hidden">
-              <EmailDetailView email={selectedEmail} onBack={handleBack} onDelete={() => handleScheduled(false)} />
+              <EmailDetailView email={selectedEmail} onBack={handleBack} onDelete={() => handleScheduled()} />
             </div>
           ) : (
             <div className="flex-1 overflow-hidden flex flex-col">
@@ -160,6 +170,7 @@ export default function DashboardPage() {
                   onSelect={handleSelectScheduled}
                   selectedId={selectedEmail?.id}
                   searchQuery={searchQuery}
+                  activeFilter={activeFilter}
                   refreshTrigger={refreshTrigger}
                 />
               ) : (
@@ -167,6 +178,7 @@ export default function DashboardPage() {
                   onSelect={handleSelectSent}
                   selectedId={selectedEmail?.id}
                   searchQuery={searchQuery}
+                  activeFilter={activeFilter}
                   refreshTrigger={refreshTrigger}
                 />
               )}

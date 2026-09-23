@@ -11,13 +11,25 @@ interface ScheduledListProps {
   onSelect: (email: ScheduledEmail) => void;
   selectedId?: string;
   searchQuery?: string;
+  activeFilter?: string;
   refreshTrigger?: number | string;
 }
 
-export default function ScheduledList({ onSelect, selectedId, searchQuery = '', refreshTrigger }: ScheduledListProps) {
+export default function ScheduledList({ onSelect, selectedId, searchQuery = '', activeFilter = 'ALL', refreshTrigger }: ScheduledListProps) {
   const { emails, isLoading, error } = useScheduledEmails({ refreshTrigger });
 
   const filteredEmails = emails.filter((email) => {
+    // Starred filter
+    if (activeFilter === 'STARRED') {
+      try {
+        const stored = localStorage.getItem('starred_emails');
+        const starredIds: string[] = stored ? JSON.parse(stored) : [];
+        if (!starredIds.includes(email.id)) return false;
+      } catch {
+        return false;
+      }
+    }
+
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (

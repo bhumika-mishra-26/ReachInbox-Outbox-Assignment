@@ -19,10 +19,12 @@ interface SidebarProps {
   onCompose: () => void;
   scheduledCount: number;
   sentCount: number;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export default function Sidebar({
-  activeTab, onTabChange, onCompose, scheduledCount, sentCount,
+  activeTab, onTabChange, onCompose, scheduledCount, sentCount, isOpen = false, onClose = () => {},
 }: SidebarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -36,13 +38,38 @@ export default function Sidebar({
 
   const displayName = user?.name || user?.email?.split('@')[0] || 'User';
   const colorIdx = getColorIndex(displayName);
-  const initials = getInitials(displayName);
 
   return (
-    <aside className="w-[272px] min-h-screen bg-white border-r border-gray-100 flex flex-col flex-shrink-0">
+    <>
+      {/* Mobile backdrop */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 md:hidden"
+        />
+      )}
+
+      <aside className={`
+        fixed md:static inset-y-0 left-0 z-50 w-[272px] bg-white border-r border-gray-100 flex flex-col flex-shrink-0
+        transform transition-transform duration-200 ease-in-out
+        ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}
+      `}>
       {/* Logo */}
-      <div className="px-5 pt-5 pb-4">
-        <span className="text-2xl font-black tracking-tighter text-gray-900">ONB</span>
+      <div className="px-5 pt-5 pb-4 flex items-center gap-2.5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.png"
+          alt="ReachInbox Logo"
+          className="h-8 w-8 object-contain flex-shrink-0"
+        />
+        <div className="flex flex-col">
+          <span className="text-lg font-black tracking-tight text-gray-900 leading-none">
+            Reach<span className="text-[#00B964]">Inbox</span>
+          </span>
+          <span className="text-[10px] font-semibold text-gray-400 tracking-wider uppercase mt-0.5">
+            Scheduler
+          </span>
+        </div>
       </div>
 
       {/* User card */}
@@ -95,7 +122,7 @@ export default function Sidebar({
           {/* Scheduled */}
           <button
             id="nav-scheduled"
-            onClick={() => onTabChange('scheduled')}
+            onClick={() => { onTabChange('scheduled'); onClose(); }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 ${
               activeTab === 'scheduled'
                 ? 'bg-green-50 text-green-700'
@@ -114,7 +141,7 @@ export default function Sidebar({
           {/* Sent */}
           <button
             id="nav-sent"
-            onClick={() => onTabChange('sent')}
+            onClick={() => { onTabChange('sent'); onClose(); }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 ${
               activeTab === 'sent'
                 ? 'bg-green-50 text-green-700'
@@ -132,5 +159,6 @@ export default function Sidebar({
         </nav>
       </div>
     </aside>
+    </>
   );
 }

@@ -47,6 +47,7 @@ export interface SentEmail {
   status: 'SENT' | 'FAILED';
   senderId: string;
   senderEmail?: string;
+  previewUrl?: string;
   createdAt: string;
 }
 

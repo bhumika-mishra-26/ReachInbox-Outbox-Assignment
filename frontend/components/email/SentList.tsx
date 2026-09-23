@@ -11,13 +11,27 @@ interface SentListProps {
   onSelect: (email: SentEmail) => void;
   selectedId?: string;
   searchQuery?: string;
+  activeFilter?: string;
   refreshTrigger?: number | string;
 }
 
-export default function SentList({ onSelect, selectedId, searchQuery = '', refreshTrigger }: SentListProps) {
+export default function SentList({ onSelect, selectedId, searchQuery = '', activeFilter = 'ALL', refreshTrigger }: SentListProps) {
   const { emails, isLoading, error } = useSentEmails({ refreshTrigger });
 
   const filteredEmails = emails.filter((email) => {
+    // Filter by status if specified
+    if (activeFilter === 'FAILED' && email.status !== 'FAILED') return false;
+    if (activeFilter === 'SENT' && email.status !== 'SENT') return false;
+    if (activeFilter === 'STARRED') {
+      try {
+        const stored = localStorage.getItem('starred_emails');
+        const starredIds: string[] = stored ? JSON.parse(stored) : [];
+        if (!starredIds.includes(email.id)) return false;
+      } catch {
+        return false;
+      }
+    }
+
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (

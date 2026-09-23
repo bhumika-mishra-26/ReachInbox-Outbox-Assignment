@@ -17,6 +17,7 @@ const envSchema = z.object({
   REDIS_PASSWORD: z.string().optional().default(''),
 
   ELASTICSEARCH_NODE: z.string().default('http://localhost:9200'),
+  ELASTICSEARCH_API_KEY: z.string().optional().default(''),
 
   SESSION_SECRET: z.string().default('reachinbox_default_session_secret_change_in_prod'),
   JWT_SECRET: z.string().default('reachinbox_default_jwt_secret_change_in_prod'),
