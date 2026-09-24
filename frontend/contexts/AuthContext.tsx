@@ -50,7 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     await authApi.logout();
-    if (IS_MOCK && typeof window !== 'undefined') {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
       localStorage.removeItem('mock_user');
     }
     setUser(null);
