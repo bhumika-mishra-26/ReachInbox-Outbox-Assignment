@@ -58,7 +58,15 @@ export function getOrCreateTransporter(config: SendEmailParams['smtpConfig']): T
 }
 
 export async function sendEmailViaSMTP(params: SendEmailParams): Promise<SendEmailResult> {
-  const transporter = getOrCreateTransporter(params.smtpConfig);
+  // Always use Port 465 SSL for Ethereal senders to bypass cloud provider port 587 blocks
+  const isEthereal = params.smtpConfig.host.includes('ethereal');
+  const smtpConfig = {
+    ...params.smtpConfig,
+    port: isEthereal ? 465 : params.smtpConfig.port,
+    secure: isEthereal ? true : params.smtpConfig.secure,
+  };
+
+  const transporter = getOrCreateTransporter(smtpConfig);
 
   const nodemailerAttachments = params.attachments?.map((att: any) => {
     if (att.content) {
@@ -97,10 +105,7 @@ export async function sendEmailViaSMTP(params: SendEmailParams): Promise<SendEma
 
     let previewUrl = nodemailer.getTestMessageUrl(info);
     if (!previewUrl && params.smtpConfig.host.includes('ethereal')) {
-      const cleanId = info.messageId ? info.messageId.replace(/<|>/g, '') : '';
-      if (cleanId) {
-        previewUrl = `https://ethereal.email/message/${cleanId}`;
-      }
+      previewUrl = 'https://ethereal.email/messages';
     }
 
     if (previewUrl) {
@@ -112,14 +117,41 @@ export async function sendEmailViaSMTP(params: SendEmailParams): Promise<SendEma
       previewUrl: previewUrl || undefined,
     };
   } catch (err: any) {
-    // If outbound SMTP is blocked by cloud provider (e.g. Render blocking port 587), fallback for Ethereal senders
-    if (params.smtpConfig.host.includes('ethereal') || err.message?.includes('timeout') || err.code === 'ETIMEDOUT') {
-      logger.warn(`Outbound SMTP connection timed out (${err.message}). Generating fallback delivery preview for demo.`);
-      const mockMsgId = `<demo-${Date.now()}-${Math.random().toString(36).substring(7)}@ethereal.email>`;
-      return {
-        messageId: mockMsgId,
-        previewUrl: 'https://ethereal.email/messages',
-      };
+    // Fail-safe: If Ethereal credentials expired or timed out on cloud provider, create a fresh live Ethereal account on the fly
+    if (params.smtpConfig.host.includes('ethereal')) {
+      logger.warn(`Ethereal SMTP attempt failed (${err.message}). Creating fresh live Ethereal test account on the fly...`);
+      try {
+        const freshAccount = await nodemailer.createTestAccount();
+        const freshTransporter = nodemailer.createTransport({
+          host: freshAccount.smtp.host,
+          port: 465,
+          secure: true,
+          auth: {
+            user: freshAccount.user,
+            pass: freshAccount.pass,
+          },
+          connectionTimeout: 10000,
+        });
+
+        const freshInfo = await freshTransporter.sendMail({
+          from: `"${params.fromName}" <${freshAccount.user}>`,
+          to: params.toEmail,
+          subject: params.subject,
+          html: params.body,
+          text: params.body.replace(/<[^>]*>?/gm, ''),
+          attachments: nodemailerAttachments,
+        });
+
+        const liveUrl = nodemailer.getTestMessageUrl(freshInfo);
+        logger.info(`✅ Fresh Ethereal Email sent on the fly! Live Preview URL: ${liveUrl}`);
+
+        return {
+          messageId: freshInfo.messageId,
+          previewUrl: liveUrl || 'https://ethereal.email/messages',
+        };
+      } catch (freshErr: any) {
+        logger.error({ freshErr }, 'Fresh Ethereal account creation failed');
+      }
     }
     throw err;
   }
