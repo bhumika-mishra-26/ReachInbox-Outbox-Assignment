@@ -2,7 +2,9 @@ import { Request, Response } from 'express';
 import { prisma } from '../db/prisma';
 import { EmailService } from '../services/email.service';
 import { emailQueue } from '../queues/email.queue';
+import { reconcilePendingEmails } from '../queues/reconciliation';
 import { AuthenticatedUser } from '../types';
+import { logger } from '../config/logger';
 
 export class EmailController {
   /**
@@ -21,8 +23,6 @@ export class EmailController {
       attachments,
     } = req.body;
 
-    // DEBUG: Log what the backend receives for attachments
-    const { logger } = require('../config/logger');
     logger.info(`[EmailController.schedule] Received attachments: ${attachments ? `${attachments.length} item(s)` : 'null/undefined'}`);
     if (attachments && attachments.length > 0) {
       attachments.forEach((att: any, i: number) => {
@@ -40,7 +40,6 @@ export class EmailController {
       return;
     }
 
-    // Handle payload key variations from frontend (scheduledFor vs startTime, delayBetweenEmailsSeconds vs delayBetweenEmailsMs)
     const rawStartTime = startTime || req.body.scheduledFor;
     const scheduledStartTime = rawStartTime ? new Date(rawStartTime) : new Date();
 
@@ -51,7 +50,6 @@ export class EmailController {
       ? Number(rawDelaySec) * 1000
       : 2000;
 
-    // If hourly limit was passed and sender exists, update sender's hourlyLimit if needed
     if (hourlyLimit && senderId) {
       await prisma.sender.update({
         where: { id: senderId },
@@ -85,6 +83,9 @@ export class EmailController {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
     const skip = (page - 1) * limit;
+
+    // Trigger reconciliation asynchronously to pick up any overdue jobs in BullMQ
+    reconcilePendingEmails().catch(() => {});
 
     const whereClause: any = {
       status: 'SCHEDULED',
@@ -179,13 +180,11 @@ export class EmailController {
       return;
     }
 
-    // Update status to CANCELLED in DB
     await prisma.email.update({
       where: { id },
       data: { status: 'CANCELLED' },
     });
 
-    // Remove from BullMQ queue if present
     const job = await emailQueue.getJob(id);
     if (job) {
       await job.remove();
