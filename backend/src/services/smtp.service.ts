@@ -95,20 +95,27 @@ export async function sendEmailViaSMTP(params: SendEmailParams): Promise<SendEma
       logger.info(`Ethereal Email sent! Preview URL: ${previewUrl}`);
     }
 
-    return {
-      messageId: info.messageId,
-      previewUrl: previewUrl || undefined,
-    };
-  } catch (err: any) {
-    // If outbound SMTP is blocked by cloud provider (e.g. Render blocking port 587), fallback for Ethereal senders
-    if (params.smtpConfig.host.includes('ethereal') || err.message?.includes('timeout') || err.code === 'ETIMEDOUT') {
-      logger.warn(`Outbound SMTP connection timed out (${err.message}). Generating fallback delivery preview for demo.`);
-      const mockMsgId = `<demo-${Date.now()}-${Math.random().toString(36).substring(7)}@ethereal.email>`;
-      return {
-        messageId: mockMsgId,
-        previewUrl: 'https://ethereal.email/messages',
-      };
+    let previewUrl = nodemailer.getTestMessageUrl(info);
+    if (!previewUrl && params.smtpConfig.host.includes('ethereal')) {
+      const cleanId = info.messageId ? info.messageId.replace(/<|>/g, '') : '';
+      if (cleanId) {
+        previewUrl = `https://ethereal.email/message/${cleanId}`;
+      }
     }
-    throw err;
-  }
-}
+//     return {
+//       messageId: info.messageId,
+//       previewUrl: previewUrl || undefined,
+//     };
+//   } catch (err: any) {
+//     // If outbound SMTP is blocked by cloud provider (e.g. Render blocking port 587), fallback for Ethereal senders
+//     if (params.smtpConfig.host.includes('ethereal') || err.message?.includes('timeout') || err.code === 'ETIMEDOUT') {
+//       logger.warn(`Outbound SMTP connection timed out (${err.message}). Generating fallback delivery preview for demo.`);
+//       const mockMsgId = `<demo-${Date.now()}-${Math.random().toString(36).substring(7)}@ethereal.email>`;
+//       return {
+//         messageId: mockMsgId,
+//         previewUrl: 'https://ethereal.email/messages',
+//       };
+//     }
+//     throw err;
+//   }
+// }
