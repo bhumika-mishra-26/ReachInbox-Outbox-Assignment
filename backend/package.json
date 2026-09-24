@@ -6,7 +6,9 @@
   "scripts": {
     "build": "tsc",
     "start:api": "node dist/server.js",
+    "start:combined": "node dist/server-with-worker.js",
     "dev:api": "tsx watch src/server.ts",
+    "dev:combined": "tsx watch src/server-with-worker.ts",
     "start:worker": "node dist/worker.js",
     "dev:worker": "tsx watch src/worker.ts",
     "prisma:generate": "prisma generate",
