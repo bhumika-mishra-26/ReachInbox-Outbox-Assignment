@@ -27,27 +27,21 @@ export interface SendEmailResult {
   previewUrl?: string | false;
 }
 
-// Transporter cache per sender email to avoid re-creating connections
 const transporterCache = new Map<string, Transporter>();
 
 export function getOrCreateTransporter(config: SendEmailParams['smtpConfig']): Transporter {
-  // Upgrade Ethereal port 587 connections to port 465 SSL to bypass cloud SMTP port blocks
-  const isEthereal = config.host.includes('ethereal');
-  const port = isEthereal ? 465 : config.port;
-  const secure = isEthereal ? true : config.secure;
-
-  const cacheKey = `${config.user}@${config.host}:${port}`;
+  const cacheKey = `${config.user}@${config.host}:${config.port}`;
 
   if (!transporterCache.has(cacheKey)) {
     const transporter = nodemailer.createTransport({
       host: config.host,
-      port: port,
-      secure: secure,
+      port: config.port,
+      secure: config.secure,
       auth: {
         user: config.user,
         pass: config.pass,
       },
-      connectionTimeout: 10000, // 10s connection timeout
+      connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 15000,
     });
@@ -58,19 +52,10 @@ export function getOrCreateTransporter(config: SendEmailParams['smtpConfig']): T
 }
 
 export async function sendEmailViaSMTP(params: SendEmailParams): Promise<SendEmailResult> {
-  // Always use Port 465 SSL for Ethereal senders to bypass cloud provider port 587 blocks
   const isEthereal = params.smtpConfig.host.includes('ethereal');
-  const smtpConfig = {
-    ...params.smtpConfig,
-    port: isEthereal ? 465 : params.smtpConfig.port,
-    secure: isEthereal ? true : params.smtpConfig.secure,
-  };
-
-  const transporter = getOrCreateTransporter(smtpConfig);
 
   const nodemailerAttachments = params.attachments?.map((att: any) => {
     if (att.content) {
-      // Extract base64 portion whether it's a data URI or raw base64 string
       const base64Match = att.content.match(/^data:.*?;base64,(.*)$/s);
       const rawBase64 = base64Match ? base64Match[1] : att.content;
       
@@ -93,66 +78,56 @@ export async function sendEmailViaSMTP(params: SendEmailParams): Promise<SendEma
     };
   });
 
-  try {
-    const info = await transporter.sendMail({
-      from: `"${params.fromName}" <${params.fromEmail}>`,
-      to: params.toEmail,
-      subject: params.subject,
-      html: params.body,
-      text: params.body.replace(/<[^>]*>?/gm, ''), // fallback plain text
-      attachments: nodemailerAttachments,
-    });
+  // For Ethereal: dynamically create a live test account so getTestMessageUrl ALWAYS returns a working URL
+  if (isEthereal) {
+    try {
+      const testAccount = await nodemailer.createTestAccount();
+      const etherealTransporter = nodemailer.createTransport({
+        host: testAccount.smtp.host,
+        port: 465,
+        secure: true,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+        connectionTimeout: 10000,
+      });
 
-    let previewUrl = nodemailer.getTestMessageUrl(info);
-    if (!previewUrl && params.smtpConfig.host.includes('ethereal')) {
-      previewUrl = 'https://ethereal.email/messages';
+      const info = await etherealTransporter.sendMail({
+        from: `"${params.fromName}" <${params.fromEmail}>`,
+        to: params.toEmail,
+        subject: params.subject,
+        html: params.body,
+        text: params.body.replace(/<[^>]*>?/gm, ''),
+        attachments: nodemailerAttachments,
+      });
+
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      logger.info(`✅ Live Ethereal Email sent! Preview URL: ${previewUrl}`);
+
+      return {
+        messageId: info.messageId,
+        previewUrl: previewUrl || undefined,
+      };
+    } catch (etherealErr: any) {
+      logger.error({ etherealErr }, 'Error sending via dynamic Ethereal test account');
     }
-
-    if (previewUrl) {
-      logger.info(`Ethereal Email sent! Preview URL: ${previewUrl}`);
-    }
-
-    return {
-      messageId: info.messageId,
-      previewUrl: previewUrl || undefined,
-    };
-  } catch (err: any) {
-    // Fail-safe: If Ethereal credentials expired or timed out on cloud provider, create a fresh live Ethereal account on the fly
-    if (params.smtpConfig.host.includes('ethereal')) {
-      logger.warn(`Ethereal SMTP attempt failed (${err.message}). Creating fresh live Ethereal test account on the fly...`);
-      try {
-        const freshAccount = await nodemailer.createTestAccount();
-        const freshTransporter = nodemailer.createTransport({
-          host: freshAccount.smtp.host,
-          port: 465,
-          secure: true,
-          auth: {
-            user: freshAccount.user,
-            pass: freshAccount.pass,
-          },
-          connectionTimeout: 10000,
-        });
-
-        const freshInfo = await freshTransporter.sendMail({
-          from: `"${params.fromName}" <${freshAccount.user}>`,
-          to: params.toEmail,
-          subject: params.subject,
-          html: params.body,
-          text: params.body.replace(/<[^>]*>?/gm, ''),
-          attachments: nodemailerAttachments,
-        });
-
-        const liveUrl = nodemailer.getTestMessageUrl(freshInfo);
-        logger.info(`✅ Fresh Ethereal Email sent on the fly! Live Preview URL: ${liveUrl}`);
-
-        return {
-          messageId: freshInfo.messageId,
-          previewUrl: liveUrl || 'https://ethereal.email/messages',
-        };
-      } catch (freshErr: any) {
-        logger.error({ freshErr }, 'Fresh Ethereal account creation failed');
-      }
-    }
-    throw err;
   }
+
+  // Regular SMTP sending (Gmail / Custom SMTP)
+  const transporter = getOrCreateTransporter(params.smtpConfig);
+  const info = await transporter.sendMail({
+    from: `"${params.fromName}" <${params.fromEmail}>`,
+    to: params.toEmail,
+    subject: params.subject,
+    html: params.body,
+    text: params.body.replace(/<[^>]*>?/gm, ''),
+    attachments: nodemailerAttachments,
+  });
+
+  const previewUrl = nodemailer.getTestMessageUrl(info);
+  return {
+    messageId: info.messageId,
+    previewUrl: previewUrl || undefined,
+  };
 }
