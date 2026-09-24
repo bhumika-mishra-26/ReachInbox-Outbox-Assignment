@@ -35,6 +35,33 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// ─── JWT Token Helpers ────────────────────────────────────────────────────────
+
+export const TOKEN_KEY = 'auth_token';
+
+export function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  if (typeof window !== 'undefined') localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function removeToken(): void {
+  if (typeof window !== 'undefined') localStorage.removeItem(TOKEN_KEY);
+}
+
+// Attach JWT Bearer token to every request if present
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+});
+
 function extractMessage(err: unknown): string {
   if (err instanceof AxiosError) {
     return err.response?.data?.message || err.message || 'Something went wrong';
@@ -76,6 +103,7 @@ export const authApi = {
 
   logout: async (): Promise<void> => {
     if (IS_MOCK) { await mockDelay(200); return; }
+    removeToken();
     try { await api.post('/api/auth/logout'); } catch { /* ignore */ }
   },
 
