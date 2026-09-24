@@ -17,6 +17,16 @@ Production-grade, horizontally scalable email scheduler service and dashboard bu
 
 ---
 
+## 🎥 Project Demo Video
+
+### ▶️ Watch the Complete Project Demo
+
+[**Watch ReachInbox Demo Video on Google Drive**](https://drive.google.com/file/d/1HM0QV8AtuEOqqayObyq7xU-2gVE0sDdJ/view?usp=sharing)
+
+The demo video showcases the working application, including email scheduling, BullMQ + Redis queue processing, rate limiting, dashboard functionality, Elasticsearch search, Slack integration, and queue monitoring.
+
+---
+
 ## 🛠 Tech Stack
 
 - **Backend**: Node.js, TypeScript, Express.js
@@ -48,6 +58,7 @@ This provisions:
 ### 2. How to Set Up Ethereal Email & Env Variables
 
 #### Setting Up Environment Variables
+
 Copy `.env.example` to `backend/.env` and `frontend/.env.local`:
 
 ```bash
@@ -61,6 +72,7 @@ cp frontend/.env.example frontend/.env.local
 #### Complete Environment Variable Configuration
 
 ##### Backend (`backend/.env`):
+
 - `PORT`: `5000`
 - `NODE_ENV`: `development`
 - `FRONTEND_URL`: `http://localhost:3000`
@@ -82,11 +94,13 @@ cp frontend/.env.example frontend/.env.local
 - `AWS_ENDPOINT_URL_S3`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET_NAME`: S3 Attachment Storage credentials
 
 ##### Frontend (`frontend/.env.local`):
+
 - `NEXT_PUBLIC_MOCK_MODE`: `false` (Set to `false` to connect to real backend API on port 5000)
 - `NEXT_PUBLIC_API_URL`: `http://localhost:5000`
 - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`: Google OAuth Client ID matching the backend
 
 #### Setting Up Ethereal Email (Fake SMTP)
+
 Ethereal Email provides fake SMTP credentials for safe testing without dispatching real emails.
 
 Run the built-in seed script to generate an Ethereal SMTP account automatically and seed it into your database as the primary sender:
@@ -95,6 +109,7 @@ Run the built-in seed script to generate an Ethereal SMTP account automatically 
 cd backend
 npm run seed:ethereal
 ```
+
 *This automatically contacts the Ethereal API, provisions host `smtp.ethereal.email`, port `587`, username, and password, and saves it into PostgreSQL as the active sender.*
 
 ### 3. How to Run Backend (API & Worker)
@@ -102,6 +117,7 @@ npm run seed:ethereal
 You can run the backend in **two modes**:
 
 #### Option A: Combined Single-Process Mode (Recommended for Deployment / Render Free Tier)
+
 Runs both the Express REST API server and the BullMQ Email Worker inside a **single unified process**:
 
 ```bash
@@ -110,10 +126,12 @@ npm install
 npm run build
 npm run start:combined
 ```
+
 - **Combined API + Worker Server**: Runs on `http://localhost:5000`
 - **Bull Board Queue Dashboard**: Accessible live at `http://localhost:5000/admin/queues`
 
 #### Option B: Process Separation Mode (For Horizontal Scaling / Development)
+
 Runs the API server and BullMQ Worker in separate dedicated terminals:
 
 ```bash
@@ -126,6 +144,7 @@ npm run dev:api
 # Terminal 2: Run BullMQ Worker
 npm run dev:worker
 ```
+
 - **API Server**: Runs on `http://localhost:5000`
 - **Bull Board Queue Dashboard**: Accessible live at `http://localhost:5000/admin/queues`
 
@@ -138,6 +157,7 @@ cd frontend
 npm install
 npm run dev
 ```
+
 - **Frontend Dashboard**: Runs on `http://localhost:3000`
 
 ---
@@ -145,18 +165,21 @@ npm run dev
 ## 🏛 Architecture Overview
 
 ### How Scheduling Works
+
 - When a user submits an email batch via the frontend dashboard or API (`POST /api/emails/schedule`), the backend creates `Email` records in PostgreSQL with status `SCHEDULED`.
 - For each recipient, a delayed job is added directly to **BullMQ** with a `delay` calculated as `scheduledFor.getTime() - Date.now()`.
 - **Zero Cron Jobs:** Job execution is purely event-driven using Redis delayed job queues.
 - When the timer expires, BullMQ pushes the job to active workers for processing.
 
 ### How Persistence on Restart is Handled
+
 - **Dual Layer Persistence:** All scheduled emails are stored in both PostgreSQL and Redis (with `--appendonly yes` AOF persistence).
 - **Worker Reconciliation on Boot:** Whenever the worker process boots (`worker.ts`), `reconciliation.ts` queries PostgreSQL for any pending `SCHEDULED` emails whose execution time is still in the future or overdue.
 - **Idempotency via Database UUIDs:** Every job is added to BullMQ using the database `email.id` as its unique `jobId`. If a job is already queued in Redis, BullMQ ignores the duplicate enqueue attempt (`no-op`).
 - **Restart Survival:** If the worker or server crashes and restarts, future emails execute exactly on schedule without being duplicated or restarted from scratch.
 
 ### How Rate Limiting & Concurrency are Implemented
+
 - **Worker Concurrency:** Configurable per worker instance (e.g. `WORKER_CONCURRENCY=5`). Multiple worker instances can run in parallel without race conditions.
 - **Provider Throttling (Per-Email Delay):** The worker enforces a configurable minimum delay (e.g. 2000ms) between individual email dispatches to prevent provider flags.
 - **Hourly Rate Limiting:** Enforced per sender using Redis sliding hour-window counters (`ratelimit:{senderId}:{YYYY-MM-DDTHH}`).
@@ -170,6 +193,7 @@ npm run dev
 ## 📋 List of Features Implemented
 
 ### Backend Features
+
 - **Job Scheduler**: Persistent scheduling using BullMQ delayed jobs backed by Redis (No cron jobs used).
 - **Persistence & Idempotency**: PostgreSQL DB storage combined with Redis AOF persistence and database UUID deduplication (`jobId`) ensuring clean restart survival.
 - **Rate Limiting**: Atomic Redis counter rate limiter per sender per hour (`MAX_EMAILS_PER_HOUR`), automatically pushing overflow jobs into the next hourly window.
@@ -180,6 +204,7 @@ npm run dev
 - **BullBoard Dashboard**: Live real-time visibility into queue states mounted at `/admin/queues`.
 
 ### Frontend Features
+
 - **Google OAuth Login**: Authentic Google OAuth 2.0 authentication flow displaying user avatar, name, email, and logout functionality.
 - **Main Dashboard**: Clean layout with header, navigation, statistics, and tabbed view for scheduled vs. sent emails.
 - **Compose & CSV Batch Scheduler**:
