@@ -106,7 +106,7 @@ export async function sendEmailViaSMTP(params: SendEmailParams): Promise<SendEma
       const mockMsgId = `<demo-${Date.now()}-${Math.random().toString(36).substring(7)}@ethereal.email>`;
       return {
         messageId: mockMsgId,
-        previewUrl: `https://ethereal.email/message/${mockMsgId.replace(/[^a-zA-Z0-9]/g, '')}`,
+        previewUrl: 'https://ethereal.email/messages',
       };
     }
     throw err;
