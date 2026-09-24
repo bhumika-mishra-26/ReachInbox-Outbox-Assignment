@@ -25,7 +25,7 @@ async function seedGmailSender() {
       email: email,
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: Number(process.env.SMTP_PORT) || 465,
-      secure: true,
+      secure: process.env.SMTP_PORT ? process.env.SMTP_PORT === '465' : true,
       user: email,
       pass: appPassword.replace(/\s+/g, ''),
       hourlyLimit: 200,

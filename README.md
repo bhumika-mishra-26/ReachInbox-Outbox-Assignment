@@ -99,15 +99,31 @@ npm run seed:ethereal
 
 ### 3. How to Run Backend (API & Worker)
 
+You can run the backend in **two modes**:
+
+#### Option A: Combined Single-Process Mode (Recommended for Deployment / Render Free Tier)
+Runs both the Express REST API server and the BullMQ Email Worker inside a **single unified process**:
+
 ```bash
 cd backend
 npm install
-npx prisma db push
+npm run build
+npm run start:combined
+```
+- **Combined API + Worker Server**: Runs on `http://localhost:5000`
+- **Bull Board Queue Dashboard**: Accessible live at `http://localhost:5000/admin/queues`
 
-# Run API Server (Express.js)
+#### Option B: Process Separation Mode (For Horizontal Scaling / Development)
+Runs the API server and BullMQ Worker in separate dedicated terminals:
+
+```bash
+cd backend
+npm install
+
+# Terminal 1: Run API Server (Express.js)
 npm run dev:api
 
-# In a separate terminal, run BullMQ Worker
+# Terminal 2: Run BullMQ Worker
 npm run dev:worker
 ```
 - **API Server**: Runs on `http://localhost:5000`

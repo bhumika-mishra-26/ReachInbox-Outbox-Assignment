@@ -15,30 +15,27 @@ import { createEmailWorker } from './queues/email.worker';
 
 const server = http.createServer(app);
 const PORT = env.PORT || 5000;
-const baseUrl = process.env.RENDER_EXTERNAL_URL || env.BACKEND_URL || `http://localhost:${PORT}`;
 
 async function start() {
   // ── 1. Start BullMQ Worker ──────────────────────────────────────────────
-  logger.info('⚙️  Initializing BullMQ Email Worker...');
+  logger.info('⚙️ Initializing BullMQ Email Worker...');
   logger.info(`Concurrency: ${env.WORKER_CONCURRENCY}, Throttle: ${env.DEFAULT_MIN_DELAY_BETWEEN_EMAILS_MS}ms`);
 
   try {
     await SearchService.ensureIndex();
     await reconcilePendingEmails();
-
     const worker = createEmailWorker();
-    logger.info('✅ BullMQ Worker is now actively consuming jobs');
+    logger.info('🚀 BullMQ Worker is now actively consuming jobs');
 
     // ── 2. Start HTTP API Server ─────────────────────────────────────────
     server.listen(PORT, () => {
       logger.info(`🚀 ReachInbox API Server running on port ${PORT} [${env.NODE_ENV}]`);
-      logger.info(`📊 Bull Board Dashboard available at ${baseUrl}/admin/queues`);
+      logger.info(`📊 Bull Board Dashboard: http://localhost:${PORT}/admin/queues`);
     });
 
     // ── 3. Graceful Shutdown ─────────────────────────────────────────────
     const shutdown = async (signal: string) => {
       logger.info(`Received ${signal}. Shutting down gracefully...`);
-
       server.close(async () => {
         try {
           await worker.close();
@@ -53,12 +50,11 @@ async function start() {
           process.exit(1);
         }
       });
-
       setTimeout(() => process.exit(1), 15000);
     };
 
     process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGINT',  () => shutdown('SIGINT'));
 
     process.on('unhandledRejection', (reason: any) => {
       const msg = String(reason?.message || reason || '');

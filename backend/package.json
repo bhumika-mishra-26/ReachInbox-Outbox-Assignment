@@ -6,11 +6,11 @@
   "scripts": {
     "build": "tsc",
     "start:api": "node dist/server.js",
+    "start:worker": "node dist/worker.js",
     "start:combined": "node dist/server-with-worker.js",
     "dev:api": "tsx watch src/server.ts",
-    "dev:combined": "tsx watch src/server-with-worker.ts",
-    "start:worker": "node dist/worker.js",
     "dev:worker": "tsx watch src/worker.ts",
+    "dev:combined": "tsx watch src/server-with-worker.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",

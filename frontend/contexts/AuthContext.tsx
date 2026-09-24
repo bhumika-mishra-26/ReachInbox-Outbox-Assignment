@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { authApi, setToken, removeToken } from '@/lib/api';
+import { authApi } from '@/lib/api';
 import type { User } from '@/types';
 
 const IS_MOCK = process.env.NEXT_PUBLIC_MOCK_MODE === 'true';
@@ -26,26 +26,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // 1. Check for ?token= in the URL (Google OAuth redirect)
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const urlToken = params.get('token');
-      if (urlToken) {
-        setToken(urlToken);
-        // Clean token from URL bar without reloading the page
-        params.delete('token');
-        const newUrl = params.toString()
-          ? `${window.location.pathname}?${params.toString()}`
-          : window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
-      }
-    }
-
-    // 2. Fetch current user (will use saved token via axios interceptor)
-    authApi.me().then((u) => {
-      setUser(u);
-      setIsLoading(false);
-    });
+    authApi
+      .me()
+      .then((u) => {
+        setUser(u);
+      })
+      .catch(() => {
+        setUser(null);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, []);
 
   const login = async (email: string, password: string) => {

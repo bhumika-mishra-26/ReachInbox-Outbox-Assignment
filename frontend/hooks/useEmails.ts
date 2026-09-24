@@ -8,7 +8,7 @@ export interface UseEmailsOptions {
 }
 
 export function useScheduledEmails(options: UseEmailsOptions = {}) {
-  const { pollInterval = 3000, refreshTrigger } = options;
+  const { pollInterval = 10000, refreshTrigger } = options;
   const [emails, setEmails] = useState<ScheduledEmail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function useScheduledEmails(options: UseEmailsOptions = {}) {
 
   // Periodic polling & focus revalidation
   useEffect(() => {
-    if (pollInterval <= 0) return;
+    if (pollInterval <= 0 || typeof window === 'undefined') return;
 
     const intervalId = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
@@ -97,7 +97,7 @@ export function useSentEmails(options: UseEmailsOptions = {}) {
 
   // Periodic polling & focus revalidation
   useEffect(() => {
-    if (pollInterval <= 0) return;
+    if (pollInterval <= 0 || typeof window === 'undefined') return;
 
     const intervalId = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;

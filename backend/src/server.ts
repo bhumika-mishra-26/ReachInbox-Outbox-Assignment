@@ -8,11 +8,10 @@ import { redis } from './config/redis';
 const server = http.createServer(app);
 
 const PORT = env.PORT || 5000;
-const baseUrl = process.env.RENDER_EXTERNAL_URL || env.BACKEND_URL || `http://localhost:${PORT}`;
 
 server.listen(PORT, () => {
   logger.info(`🚀 ReachInbox API Server running on port ${PORT} [${env.NODE_ENV}]`);
-  logger.info(`📊 Bull Board Dashboard available at ${baseUrl}/admin/queues`);
+  logger.info(`📊 Bull Board Dashboard available at http://localhost:${PORT}/admin/queues`);
 });
 
 // Graceful Shutdown
