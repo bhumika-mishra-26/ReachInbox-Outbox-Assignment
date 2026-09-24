@@ -73,15 +73,25 @@ export default function DashboardPage() {
     setIsRefreshing(false);
   };
 
-  // Handle Slack connect query param
+  // Handle Google OAuth token & Slack connect query params
+  const { refetch } = useAuth();
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
+
+    const token = url.searchParams.get('token');
+    if (token) {
+      localStorage.setItem('auth_token', token);
+      url.searchParams.delete('token');
+      window.history.replaceState({}, '', url.toString());
+      refetch();
+    }
+
     if (url.searchParams.get('slack') === 'connected') {
       url.searchParams.delete('slack');
       window.history.replaceState({}, '', url.toString());
     }
-  }, []);
+  }, [refetch]);
 
   if (isLoading) {
     return (
