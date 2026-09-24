@@ -66,7 +66,7 @@ export function useScheduledEmails(options: UseEmailsOptions = {}) {
 }
 
 export function useSentEmails(options: UseEmailsOptions = {}) {
-  const { pollInterval = 3000, refreshTrigger } = options;
+  const { pollInterval = 10000, refreshTrigger } = options;
   const [emails, setEmails] = useState<SentEmail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

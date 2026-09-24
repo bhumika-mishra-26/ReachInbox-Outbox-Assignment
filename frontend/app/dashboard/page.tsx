@@ -59,7 +59,7 @@ export default function DashboardPage() {
       if (typeof document !== 'undefined' && !document.hidden) {
         loadCounts();
       }
-    }, 3000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [loadCounts]);
 

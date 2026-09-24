@@ -13,6 +13,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "seed:ethereal": "tsx src/scripts/seedEtherealSender.ts",
+    "seed:gmail": "tsx src/scripts/seedGmailSender.ts",
     "test": "vitest run"
   },
   "keywords": [
