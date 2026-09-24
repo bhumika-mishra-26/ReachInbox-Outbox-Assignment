@@ -76,7 +76,10 @@ export const authApi = {
       return { ...MOCK_USER, email, name: email.split('@')[0] };
     }
     try {
-      const { data } = await api.post<{ user: User }>('/api/auth/login', { email, password });
+      const { data } = await api.post<{ user: User; token?: string }>('/api/auth/login', { email, password });
+      if (data.token) {
+        setToken(data.token);
+      }
       return data.user;
     } catch (err) {
       throw new Error(extractMessage(err));
@@ -89,7 +92,10 @@ export const authApi = {
       return { ...MOCK_USER, name, email };
     }
     try {
-      const { data } = await api.post<{ user: User }>('/api/auth/register', { name, email, password });
+      const { data } = await api.post<{ user: User; token?: string }>('/api/auth/register', { name, email, password });
+      if (data.token) {
+        setToken(data.token);
+      }
       return data.user;
     } catch (err) {
       throw new Error(extractMessage(err));
