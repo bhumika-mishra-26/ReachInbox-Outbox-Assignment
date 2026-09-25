@@ -223,13 +223,10 @@ export class EmailController {
    * GET /api/emails/:id/preview  (no auth required — URL acts as a shareable preview link)
    */
   public static async renderPreview(req: Request, res: Response): Promise<void> {
-    const { id } = req.params;
+    const id = req.params['id'] as string;
 
     const email = await prisma.email.findUnique({
       where: { id },
-      include: {
-        sender: { select: { name: true, email: true } },
-      },
     });
 
     if (!email) {
@@ -245,6 +242,14 @@ export class EmailController {
       return;
     }
 
+    // Fetch sender separately to avoid Prisma include inference issues
+    const senderRecord = email.senderId
+      ? await prisma.sender.findUnique({
+          where: { id: email.senderId },
+          select: { name: true, email: true },
+        })
+      : null;
+
     const sentAt = email.sentAt
       ? new Date(email.sentAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'long', timeStyle: 'short' })
       : null;
@@ -252,8 +257,8 @@ export class EmailController {
       ? new Date(email.scheduledFor).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'long', timeStyle: 'short' })
       : null;
 
-    const senderName = email.sender?.name || 'Unknown Sender';
-    const senderEmail = email.sender?.email || '';
+    const senderName = senderRecord?.name || 'Unknown Sender';
+    const senderEmail = senderRecord?.email || '';
 
     const statusColor: Record<string, string> = {
       SENT: '#16a34a',
