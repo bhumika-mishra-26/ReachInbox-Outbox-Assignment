@@ -6,7 +6,10 @@ import { validateRequest } from '../middlewares/validate.middleware';
 
 const router = Router();
 
-// Protect all email endpoints with auth
+// Public standalone route for HTML email preview (matches Ethereal style public link)
+router.get('/:id/preview', EmailController.renderPreview);
+
+// Protect all remaining email endpoints with auth
 router.use(authMiddleware);
 
 const scheduleSchema = {

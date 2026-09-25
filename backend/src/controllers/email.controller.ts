@@ -216,4 +216,230 @@ export class EmailController {
       },
     });
   }
+
+  /**
+   * Public endpoint — renders a beautiful self-hosted HTML preview of an email.
+   * Used as a fallback preview URL when Ethereal SMTP is blocked (e.g. Render free tier).
+   * GET /api/emails/:id/preview  (no auth required — URL acts as a shareable preview link)
+   */
+  public static async renderPreview(req: Request, res: Response): Promise<void> {
+    const { id } = req.params;
+
+    const email = await prisma.email.findUnique({
+      where: { id },
+      include: {
+        sender: { select: { name: true, email: true } },
+      },
+    });
+
+    if (!email) {
+      res.status(404).send(`
+        <!DOCTYPE html><html><head><title>Not Found</title></head>
+        <body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;">
+          <div style="text-align:center;color:#888;">
+            <h2>404 — Email not found</h2>
+            <p>The preview link may have expired or the email ID is incorrect.</p>
+          </div>
+        </body></html>
+      `);
+      return;
+    }
+
+    const sentAt = email.sentAt
+      ? new Date(email.sentAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'long', timeStyle: 'short' })
+      : null;
+    const scheduledFor = email.scheduledFor
+      ? new Date(email.scheduledFor).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'long', timeStyle: 'short' })
+      : null;
+
+    const senderName = email.sender?.name || 'Unknown Sender';
+    const senderEmail = email.sender?.email || '';
+
+    const statusColor: Record<string, string> = {
+      SENT: '#16a34a',
+      FAILED: '#dc2626',
+      SCHEDULED: '#d97706',
+      CANCELLED: '#6b7280',
+    };
+    const statusBg: Record<string, string> = {
+      SENT: '#dcfce7',
+      FAILED: '#fee2e2',
+      SCHEDULED: '#fef3c7',
+      CANCELLED: '#f3f4f6',
+    };
+    const color = statusColor[email.status] || '#374151';
+    const bg = statusBg[email.status] || '#f9fafb';
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${email.subject} — ReachInbox Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      min-height: 100vh;
+      padding: 32px 16px;
+      color: #1e293b;
+    }
+    .wrapper { max-width: 720px; margin: 0 auto; }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: ${bg};
+      color: ${color};
+      border: 1px solid ${color}44;
+    }
+    .header {
+      background: white;
+      border-radius: 16px 16px 0 0;
+      padding: 28px 32px 20px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .logo {
+      font-size: 15px;
+      font-weight: 700;
+      color: #6366f1;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+    .subject {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.3;
+      margin-bottom: 16px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 8px;
+    }
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .meta-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #94a3b8;
+    }
+    .meta-value {
+      font-size: 13.5px;
+      color: #334155;
+      font-weight: 500;
+    }
+    .body-container {
+      background: white;
+      padding: 32px;
+      border-radius: 0 0 16px 16px;
+    }
+    .email-body {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+    .email-body iframe {
+      width: 100%;
+      min-height: 480px;
+      border: none;
+      display: block;
+    }
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }
+    .footer a { color: #6366f1; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <div class="logo">⚡ ReachInbox — Email Preview</div>
+      <div class="header-top">
+        <h1 class="subject">${escapeHtml(email.subject)}</h1>
+        <span class="badge">${email.status}</span>
+      </div>
+      <div class="meta-grid">
+        <div class="meta-item">
+          <span class="meta-label">From</span>
+          <span class="meta-value">${escapeHtml(senderName)} &lt;${escapeHtml(senderEmail)}&gt;</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">To</span>
+          <span class="meta-value">${escapeHtml(email.recipient)}</span>
+        </div>
+        ${sentAt ? `
+        <div class="meta-item">
+          <span class="meta-label">Sent At</span>
+          <span class="meta-value">${sentAt} IST</span>
+        </div>` : ''}
+        ${scheduledFor ? `
+        <div class="meta-item">
+          <span class="meta-label">Scheduled For</span>
+          <span class="meta-value">${scheduledFor} IST</span>
+        </div>` : ''}
+        ${email.messageId ? `
+        <div class="meta-item">
+          <span class="meta-label">Message ID</span>
+          <span class="meta-value" style="font-size:11px;word-break:break-all;color:#94a3b8;">${escapeHtml(email.messageId)}</span>
+        </div>` : ''}
+      </div>
+    </div>
+    <div class="body-container">
+      <div class="email-body">
+        <iframe
+          id="email-frame"
+          sandbox="allow-same-origin"
+          srcdoc="${escapeAttr(email.body)}"
+        ></iframe>
+      </div>
+    </div>
+    <div class="footer">
+      <p>Rendered by <a href="https://reachinbox-outbox-assignment.onrender.com" target="_blank">ReachInbox</a> &mdash; Email ID: <code>${email.id}</code></p>
+    </div>
+  </div>
+  <script>
+    // Auto-resize iframe to content height
+    const frame = document.getElementById('email-frame');
+    frame.addEventListener('load', () => {
+      try {
+        const h = frame.contentDocument.body.scrollHeight;
+        frame.style.minHeight = (h + 40) + 'px';
+      } catch(e) {}
+    });
+  </script>
+</body>
+</html>`);
+
+    function escapeHtml(str: string) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function escapeAttr(str: string) {
+      return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    }
+  }
 }

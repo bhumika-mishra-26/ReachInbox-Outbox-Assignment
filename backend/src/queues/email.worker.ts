@@ -10,6 +10,9 @@ import { SlackService } from '../services/slack.service';
 import { SearchService } from '../services/search.service';
 import { EmailJobData } from '../types';
 
+// Base URL for self-hosted email preview links (used as fallback when Ethereal SMTP is blocked)
+const APP_URL = env.APP_URL || `http://localhost:${env.PORT}`;
+
 export function createEmailWorker(): Worker<EmailJobData> {
   const worker = new Worker<EmailJobData>(
     EMAIL_QUEUE_NAME,
@@ -108,6 +111,10 @@ export function createEmailWorker(): Worker<EmailJobData> {
             user: sender.user,
             pass: sender.pass,
           },
+          // Pass emailId + appUrl so a self-hosted preview URL can be built
+          // when Ethereal SMTP is blocked (e.g. on Render free tier)
+          emailId: email.id,
+          appUrl: APP_URL,
         });
 
         // 5. Update DB status to SENT
