@@ -30,13 +30,19 @@ export interface SendEmailResult {
 const transporterCache = new Map<string, Transporter>();
 
 export function getOrCreateTransporter(config: SendEmailParams['smtpConfig']): Transporter {
-  const cacheKey = `${config.user}@${config.host}:${config.port}`;
+  const isEthereal = config.host.includes('ethereal');
+  // Ethereal SMTP requires Port 587 with STARTTLS (secure: false)
+  const host = config.host;
+  const port = isEthereal ? 587 : config.port;
+  const secure = isEthereal ? false : config.secure;
+
+  const cacheKey = `${config.user}@${host}:${port}`;
 
   if (!transporterCache.has(cacheKey)) {
     const transporter = nodemailer.createTransport({
-      host: config.host,
-      port: config.port,
-      secure: config.secure,
+      host,
+      port,
+      secure,
       auth: {
         user: config.user,
         pass: config.pass,
@@ -78,40 +84,59 @@ export async function sendEmailViaSMTP(params: SendEmailParams): Promise<SendEma
     };
   });
 
-  // For Ethereal: dynamically create a live test account so getTestMessageUrl ALWAYS returns a working URL
-  if (isEthereal) {
-    try {
-      const testAccount = await nodemailer.createTestAccount();
-      const etherealTransporter = nodemailer.createTransport({
-        host: testAccount.smtp.host,
-        port: 465,
-        secure: true,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-        connectionTimeout: 10000,
-      });
+  // If user provided an Ethereal config with credentials, use it normalized to Port 587 / STARTTLS
+  if (isEthereal && params.smtpConfig.user && params.smtpConfig.pass) {
+    const transporter = getOrCreateTransporter(params.smtpConfig);
+    const info = await transporter.sendMail({
+      from: `"${params.fromName}" <${params.fromEmail}>`,
+      to: params.toEmail,
+      subject: params.subject,
+      html: params.body,
+      text: params.body.replace(/<[^>]*>?/gm, ''),
+      attachments: nodemailerAttachments,
+    });
 
-      const info = await etherealTransporter.sendMail({
-        from: `"${params.fromName}" <${params.fromEmail}>`,
-        to: params.toEmail,
-        subject: params.subject,
-        html: params.body,
-        text: params.body.replace(/<[^>]*>?/gm, ''),
-        attachments: nodemailerAttachments,
-      });
-
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      logger.info(`✅ Live Ethereal Email sent! Preview URL: ${previewUrl}`);
-
-      return {
-        messageId: info.messageId,
-        previewUrl: previewUrl || undefined,
-      };
-    } catch (etherealErr: any) {
-      logger.error({ etherealErr }, 'Error sending via dynamic Ethereal test account');
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    if (previewUrl) {
+      logger.info(`✅ Ethereal Email sent! Preview URL: ${previewUrl}`);
     }
+
+    return {
+      messageId: info.messageId,
+      previewUrl: previewUrl || undefined,
+    };
+  }
+
+  // Dynamic Ethereal account fallback if no credentials provided
+  if (isEthereal) {
+    const testAccount = await nodemailer.createTestAccount();
+    const etherealTransporter = nodemailer.createTransport({
+      host: testAccount.smtp.host,
+      port: testAccount.smtp.port || 587,
+      secure: testAccount.smtp.secure || false,
+      auth: {
+        user: testAccount.user,
+        pass: testAccount.pass,
+      },
+      connectionTimeout: 10000,
+    });
+
+    const info = await etherealTransporter.sendMail({
+      from: `"${params.fromName}" <${params.fromEmail}>`,
+      to: params.toEmail,
+      subject: params.subject,
+      html: params.body,
+      text: params.body.replace(/<[^>]*>?/gm, ''),
+      attachments: nodemailerAttachments,
+    });
+
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    logger.info(`✅ Live Ethereal Email sent! Preview URL: ${previewUrl}`);
+
+    return {
+      messageId: info.messageId,
+      previewUrl: previewUrl || undefined,
+    };
   }
 
   // Regular SMTP sending (Gmail / Custom SMTP)
